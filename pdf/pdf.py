@@ -6,6 +6,7 @@ from django.template import Context, Template
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Boolean
 from xblock.fragment import Fragment
+from xblock.completable import XBlockCompletionMode
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 from xblock.scorable import ScorableXBlockMixin, Score
@@ -13,8 +14,9 @@ from .utils import _, DummyTranslationService
 
 loader = ResourceLoader(__name__)
 
-@XBlock.wants('settings')
-@XBlock.needs('i18n')
+
+@XBlock.wants('settings','completion')
+@XBlock.needs('i18n','user')
 class PdfBlock(
     ScorableXBlockMixin,
     XBlock,
@@ -26,6 +28,9 @@ class PdfBlock(
     Icon of the XBlock. Values : [other (default), video, problem]
     '''
     icon_class = "other"
+    completion_mode = XBlockCompletionMode.COMPLETABLE
+    has_score = False
+
 
     '''
     Fields
@@ -88,6 +93,20 @@ class PdfBlock(
         template_str = self.load_resource(template_path)
         return Template(template_str).render(Context(context))
 
+    @property
+    def user_mode(self):
+        """
+        Check user's permission mode for this XBlock.
+        Returns:
+            user permission mode
+        """
+        try:
+            if self.scope_ids.user_id is None:
+                return 'staff'
+        except AttributeError:
+            pass
+        return 'student'
+
     '''
     Main functions
     '''
@@ -96,13 +115,24 @@ class PdfBlock(
         The primary view of the XBlock, shown to students
         when viewing courses.
         """
+        completion_service = self.runtime.service(self, 'completion')
+        if completion_service:
+            completion_enabled = completion_service.completion_tracking_enabled()
+        else:
+            completion_enabled = False
+
         context = {
             'display_name': self.display_name,
             'url': self.url,
             'allow_download': self.allow_download,
             'source_text': self.source_text,
             'source_url': self.source_url,
-            '_i18n_service': self.i18n_service
+            '_i18n_service': self.i18n_service,
+            'publishCompletionUrl': self.runtime.handler_url(self, 'publish_completion', '').rstrip('?'),
+            'user_mode': 'student' if self.scope_ids.user_id is not None else 'staff',
+            'completionEnabled': completion_enabled,
+
+
         }
         html = loader.render_django_template(
             'templates/html/pdf_view.html',
@@ -126,13 +156,22 @@ class PdfBlock(
         The secondary view of the XBlock, shown to teachers
         when editing the XBlock.
         """
+        completion_service = self.runtime.service(self, 'completion')
+        if completion_service:
+            completion_enabled = completion_service.completion_tracking_enabled()
+        else:
+            completion_enabled = False
+
         context = {
+            'completionEnabled': completion_enabled,
             'display_name': self.display_name,
             'name_help': _("This name appears in the horizontal navigation at the top of the page."),
             'url': self.url,
             'allow_download': self.allow_download,
             'source_text': self.source_text,
-            'source_url': self.source_url
+            'source_url': self.source_url,
+            'publishCompletionUrl': self.runtime.handler_url(self, 'publish_completion', '').rstrip('?'),
+
         }
         html = loader.render_django_template(
             'templates/html/pdf_edit.html',
