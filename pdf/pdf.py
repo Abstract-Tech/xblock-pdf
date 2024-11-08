@@ -6,6 +6,7 @@ from django.template import Context, Template
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Boolean
 from xblock.fragment import Fragment
+from xblock.completable import XBlockCompletionMode
 from xblockutils.resources import ResourceLoader
 from xblockutils.settings import XBlockWithSettingsMixin, ThemableXBlockMixin
 from xblock.scorable import ScorableXBlockMixin, Score
@@ -26,6 +27,8 @@ class PdfBlock(
     Icon of the XBlock. Values : [other (default), video, problem]
     '''
     icon_class = "other"
+    completion_mode = XBlockCompletionMode.COMPLETABLE
+
 
     '''
     Fields
